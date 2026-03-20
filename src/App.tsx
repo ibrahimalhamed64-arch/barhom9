@@ -3,92 +3,101 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import confetti from 'canvas-confetti';
-import { Mail, Heart, Sparkles, Music, Music2 } from 'lucide-react';
+import { Mail, Heart, Sparkles, Music, Music2, Volume2, VolumeX } from 'lucide-react';
+import { Howl, Howler } from 'howler';
 
 export default function App() {
   const [isOpen, setIsOpen] = useState(false);
   const [isOpening, setIsOpening] = useState(false);
   const [recipientName] = useState('أحلى الناس');
   const [isPlaying, setIsPlaying] = useState(false);
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const [audioStatus, setAudioStatus] = useState<string>('جاهز');
+  const [imageSrc, setImageSrc] = useState('50_dinar.png');
+  const soundRef = useRef<Howl | null>(null);
 
-  // Sync audio element with isPlaying state
-  const [audioError, setAudioError] = React.useState<string | null>(null);
-
-  React.useEffect(() => {
-    if (!audioRef.current) return;
-    
-    const audio = audioRef.current;
-    
-    const handleCanPlay = () => {
-      console.log("Audio can play");
-      setAudioError(null);
-    };
-
-    const handleLoadStart = () => {
-      console.log("Audio load start");
-    };
-
-    const handleLoadedData = () => {
-      console.log("Audio loaded data");
-    };
-    
-    const handleError = (e: any) => {
-      const error = audio.error;
-      let message = "Unknown audio error";
-      if (error) {
-        switch (error.code) {
-          case 1: message = "Aborted"; break;
-          case 2: message = "Network error"; break;
-          case 3: message = "Decode error"; break;
-          case 4: message = "Source not supported"; break;
-        }
+  useEffect(() => {
+    // Initialize Howl
+    soundRef.current = new Howl({
+      src: ['./eid-music.m4a', '/eid-music.m4a', 'eid-music.m4a'],
+      html5: true, // Use HTML5 Audio for better compatibility with large files and streaming
+      loop: true,
+      volume: 1.0,
+      onload: () => {
+        console.log("Audio loaded successfully with Howler");
+        setAudioStatus('جاهز للتشغيل');
+      },
+      onloaderror: (id, error) => {
+        console.error("Howler load error:", error);
+        setAudioStatus('خطأ في التحميل');
+      },
+      onplay: () => {
+        setIsPlaying(true);
+        setAudioStatus('يعمل الآن');
+      },
+      onpause: () => {
+        setIsPlaying(false);
+        setAudioStatus('متوقف');
+      },
+      onstop: () => {
+        setIsPlaying(false);
+        setAudioStatus('متوقف');
+      },
+      onplayerror: (id, error) => {
+        console.error("Howler play error:", error);
+        setAudioStatus('خطأ في التشغيل');
+        // Try to unlock audio context on next user interaction
+        Howler.unload();
+        soundRef.current?.play();
       }
-      console.error("Audio error:", message, error);
-      setAudioError(message);
-    };
-
-    audio.addEventListener('canplay', handleCanPlay);
-    audio.addEventListener('error', handleError);
-    audio.addEventListener('loadstart', handleLoadStart);
-    audio.addEventListener('loadeddata', handleLoadedData);
+    });
 
     return () => {
-      audio.removeEventListener('canplay', handleCanPlay);
-      audio.removeEventListener('error', handleError);
-      audio.removeEventListener('loadstart', handleLoadStart);
-      audio.removeEventListener('loadeddata', handleLoadedData);
+      if (soundRef.current) {
+        soundRef.current.unload();
+      }
     };
   }, []);
 
-  React.useEffect(() => {
-    if (!audioRef.current) return;
+  const handleImageError = () => {
+    console.error("Image failed to load:", imageSrc);
+    if (imageSrc === '50_dinar.png') {
+      setImageSrc('/50_dinar.png');
+    } else if (imageSrc === '/50_dinar.png') {
+      setImageSrc('./50_dinar.png');
+    } else if (imageSrc === './50_dinar.png') {
+      // Try absolute URL as a last resort before fallback
+      const absoluteUrl = `${window.location.origin}/50_dinar.png`;
+      if (imageSrc !== absoluteUrl) {
+        setImageSrc(absoluteUrl);
+      } else {
+        setImageSrc('https://picsum.photos/seed/money/600/300');
+      }
+    }
+  };
+
+  const [audioError, setAudioError] = React.useState<string | null>(null);
+
+  const toggleMusic = () => {
+    if (!soundRef.current) return;
     
     if (isPlaying) {
-      audioRef.current.volume = 1.0;
-      const playPromise = audioRef.current.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(error => {
-          console.error("Playback failed:", error);
-          setIsPlaying(false);
-        });
-      }
+      soundRef.current.pause();
     } else {
-      audioRef.current.pause();
+      soundRef.current.play();
     }
-  }, [isPlaying]);
+  };
 
   const handleOpen = () => {
     if (!isOpen && !isOpening) {
       setIsOpening(true);
-      setIsPlaying(true);
       
-      // Start music immediately on click to avoid browser blocks
-      if (audioRef.current) {
-        audioRef.current.play().catch(e => console.error("Initial play failed:", e));
+      // Force play audio with Howler
+      if (soundRef.current) {
+        setAudioStatus('جاري التشغيل...');
+        soundRef.current.play();
       }
       
       // Delay the actual "open" state to allow flap animation
@@ -102,7 +111,9 @@ export default function App() {
 
   const handleClose = () => {
     setIsOpen(false);
-    setIsPlaying(false); // Stop music when card closes
+    if (soundRef.current) {
+      soundRef.current.stop();
+    }
   };
 
   const triggerConfetti = () => {
@@ -125,40 +136,22 @@ export default function App() {
     }, 250);
   };
 
-  const toggleMusic = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const nextPlaying = !isPlaying;
-    setIsPlaying(nextPlaying);
-    
-    if (audioRef.current) {
-      if (nextPlaying) {
-        audioRef.current.play().catch(e => console.error("Toggle play failed:", e));
-      } else {
-        audioRef.current.pause();
-      }
-    }
-  };
-
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 relative bg-[#fdfaf6] overflow-x-hidden">
-      <audio 
-        ref={audioRef} 
-        loop 
-        preload="auto"
-        onEnded={() => setIsPlaying(false)}
-        onError={(e) => {
-          console.error("Audio tag error:", e);
-          setAudioError("Source not supported or file missing");
-        }}
-      >
-        <source src="eid-music.m4a" />
-        <source src="/eid-music.m4a" />
-      </audio>
-
-      {/* Debug Info for User */}
-      <div className="fixed bottom-4 right-4 flex flex-col gap-2 z-50 pointer-events-none opacity-0 hover:opacity-100 transition-opacity">
-        <div className="bg-black/50 text-white p-2 rounded text-[10px]">
-          Audio: {audioRef.current?.readyState || 0} | Error: {audioError || 'None'}
+      {/* Debug Info for User - Hidden by default, visible on hover */}
+      <div className="fixed bottom-4 right-4 flex flex-col gap-2 z-50 opacity-0 hover:opacity-100 transition-opacity">
+        <div className="bg-black/80 text-white p-3 rounded-lg text-[10px] shadow-xl backdrop-blur-sm">
+          <p>الحالة: {audioStatus}</p>
+          {audioError && <p className="text-red-300">خطأ: {audioError}</p>}
+          <button 
+            onClick={() => {
+              Howler.unload();
+              soundRef.current?.play();
+            }}
+            className="mt-2 bg-white/20 px-2 py-1 rounded hover:bg-white/30"
+          >
+            إعادة تحميل الصوت
+          </button>
         </div>
       </div>
 
@@ -166,13 +159,16 @@ export default function App() {
       <motion.button 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        onClick={toggleMusic}
+        onClick={(e) => {
+          e.stopPropagation();
+          toggleMusic();
+        }}
         className="fixed top-6 right-6 z-50 p-4 bg-white/90 backdrop-blur-md rounded-full shadow-lg border border-rose-100 text-rose-500 hover:bg-rose-50 transition-all group"
       >
         {isPlaying ? (
-          <Music className="w-6 h-6 animate-pulse" />
+          <Volume2 className="w-6 h-6 animate-pulse" />
         ) : (
-          <Music2 className="w-6 h-6 opacity-40 group-hover:opacity-100" />
+          <VolumeX className="w-6 h-6 opacity-40 group-hover:opacity-100" />
         )}
       </motion.button>
 
@@ -317,25 +313,17 @@ export default function App() {
                     initial={{ y: 50, opacity: 0, rotate: 5, scale: 0.9 }}
                     animate={{ y: 0, opacity: 1, rotate: -2, scale: 1 }}
                     transition={{ delay: 1.8, duration: 1, type: "spring" }}
-                    className="relative w-full max-w-[380px] mx-auto mt-12 rounded-2xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.15)] border-4 border-white group"
+                    className="relative w-full max-w-[380px] mx-auto mt-12 rounded-2xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.15)] border-4 border-white group bg-white"
                   >
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity z-10" />
-                    <img 
-                      src="50_dinar.png" 
-                      alt="50 Dinars"
-                      className="w-full h-auto block transition-transform duration-700 group-hover:scale-110"
-                      onLoad={() => console.log("Image loaded successfully")}
-                      onError={(e) => {
-                        console.error("Image load error for 50_dinar.png");
-                        // Try with leading slash if relative fails
-                        const target = e.target as HTMLImageElement;
-                        if (!target.src.includes("/50_dinar.png")) {
-                          target.src = "/50_dinar.png";
-                        } else {
-                          target.src = "https://picsum.photos/seed/money/400/200";
-                        }
-                      }}
-                    />
+                    <div className="relative w-full aspect-[2/1] bg-gray-50 flex items-center justify-center overflow-hidden">
+                      <img 
+                        src={imageSrc} 
+                        alt="50 Dinars"
+                        className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-105"
+                        onLoad={() => console.log("Image loaded successfully:", imageSrc)}
+                        onError={handleImageError}
+                      />
+                    </div>
                     <div className="absolute bottom-4 right-4 z-20 bg-white/90 backdrop-blur px-4 py-2 rounded-full text-rose-600 font-bold text-sm shadow-sm">
                       عيدية خاصة 🎁
                     </div>
