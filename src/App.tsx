@@ -27,6 +27,14 @@ export default function App() {
       console.log("Audio can play");
       setAudioError(null);
     };
+
+    const handleLoadStart = () => {
+      console.log("Audio load start");
+    };
+
+    const handleLoadedData = () => {
+      console.log("Audio loaded data");
+    };
     
     const handleError = (e: any) => {
       const error = audio.error;
@@ -45,10 +53,14 @@ export default function App() {
 
     audio.addEventListener('canplay', handleCanPlay);
     audio.addEventListener('error', handleError);
+    audio.addEventListener('loadstart', handleLoadStart);
+    audio.addEventListener('loadeddata', handleLoadedData);
 
     return () => {
       audio.removeEventListener('canplay', handleCanPlay);
       audio.removeEventListener('error', handleError);
+      audio.removeEventListener('loadstart', handleLoadStart);
+      audio.removeEventListener('loadeddata', handleLoadedData);
     };
   }, []);
 
@@ -139,15 +151,16 @@ export default function App() {
           setAudioError("Source not supported or file missing");
         }}
       >
-        <source src="/bg-music.mp3" type="audio/mpeg" />
-        <source src="bg-music.mp3" type="audio/mpeg" />
+        <source src="eid-music.m4a" />
+        <source src="/eid-music.m4a" />
       </audio>
 
-      {audioError && (
-        <div className="fixed bottom-4 left-4 bg-red-500 text-white p-2 rounded text-xs z-50">
-          Audio Error: {audioError}
+      {/* Debug Info for User */}
+      <div className="fixed bottom-4 right-4 flex flex-col gap-2 z-50 pointer-events-none opacity-0 hover:opacity-100 transition-opacity">
+        <div className="bg-black/50 text-white p-2 rounded text-[10px]">
+          Audio: {audioRef.current?.readyState || 0} | Error: {audioError || 'None'}
         </div>
-      )}
+      </div>
 
       {/* Music Toggle */}
       <motion.button 
@@ -308,9 +321,20 @@ export default function App() {
                   >
                     <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity z-10" />
                     <img 
-                      src="/50_dinar.png" 
+                      src="50_dinar.png" 
                       alt="50 Dinars"
                       className="w-full h-auto block transition-transform duration-700 group-hover:scale-110"
+                      onLoad={() => console.log("Image loaded successfully")}
+                      onError={(e) => {
+                        console.error("Image load error for 50_dinar.png");
+                        // Try with leading slash if relative fails
+                        const target = e.target as HTMLImageElement;
+                        if (!target.src.includes("/50_dinar.png")) {
+                          target.src = "/50_dinar.png";
+                        } else {
+                          target.src = "https://picsum.photos/seed/money/400/200";
+                        }
+                      }}
                     />
                     <div className="absolute bottom-4 right-4 z-20 bg-white/90 backdrop-blur px-4 py-2 rounded-full text-rose-600 font-bold text-sm shadow-sm">
                       عيدية خاصة 🎁
