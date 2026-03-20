@@ -12,10 +12,10 @@ import { Howl, Howler } from 'howler';
 export default function App() {
   const [isOpen, setIsOpen] = useState(false);
   const [isOpening, setIsOpening] = useState(false);
-  const [recipientName] = useState('أحلى الناس');
+  const [recipientName, setRecipientName] = useState('أحلى الناس');
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioStatus, setAudioStatus] = useState<string>('جاهز');
-  const [imageSrc, setImageSrc] = useState('50_dinar.png');
+  const [imageSrc, setImageSrc] = useState('/50_دينار_أردني،_الوجه_الأمامي،_الإصدار_الخامس_(2022).png');
   const soundRef = useRef<Howl | null>(null);
 
   useEffect(() => {
@@ -62,20 +62,8 @@ export default function App() {
   }, []);
 
   const handleImageError = () => {
-    console.error("Image failed to load:", imageSrc);
-    if (imageSrc === '50_dinar.png') {
-      setImageSrc('/50_dinar.png');
-    } else if (imageSrc === '/50_dinar.png') {
-      setImageSrc('./50_dinar.png');
-    } else if (imageSrc === './50_dinar.png') {
-      // Try absolute URL as a last resort before fallback
-      const absoluteUrl = `${window.location.origin}/50_dinar.png`;
-      if (imageSrc !== absoluteUrl) {
-        setImageSrc(absoluteUrl);
-      } else {
-        setImageSrc('https://picsum.photos/seed/money/600/300');
-      }
-    }
+    // Fallback to a high-quality Unsplash image of money if the direct link fails
+    setImageSrc('https://images.unsplash.com/photo-1590073844006-33379778ae09?auto=format&fit=crop&q=80&w=800');
   };
 
   const [audioError, setAudioError] = React.useState<string | null>(null);
@@ -96,16 +84,15 @@ export default function App() {
       
       // Force play audio with Howler
       if (soundRef.current) {
-        setAudioStatus('جاري التشغيل...');
         soundRef.current.play();
       }
       
-      // Delay the actual "open" state to allow flap animation
+      // Delay the actual "open" state to allow flap animation (faster now)
       setTimeout(() => {
         setIsOpen(true);
         setIsOpening(false);
         triggerConfetti();
-      }, 1000);
+      }, 600);
     }
   };
 
@@ -138,23 +125,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 relative bg-[#fdfaf6] overflow-x-hidden">
-      {/* Debug Info for User - Hidden by default, visible on hover */}
-      <div className="fixed bottom-4 right-4 flex flex-col gap-2 z-50 opacity-0 hover:opacity-100 transition-opacity">
-        <div className="bg-black/80 text-white p-3 rounded-lg text-[10px] shadow-xl backdrop-blur-sm">
-          <p>الحالة: {audioStatus}</p>
-          {audioError && <p className="text-red-300">خطأ: {audioError}</p>}
-          <button 
-            onClick={() => {
-              Howler.unload();
-              soundRef.current?.play();
-            }}
-            className="mt-2 bg-white/20 px-2 py-1 rounded hover:bg-white/30"
-          >
-            إعادة تحميل الصوت
-          </button>
-        </div>
-      </div>
-
       {/* Music Toggle */}
       <motion.button 
         initial={{ opacity: 0 }}
@@ -195,7 +165,8 @@ export default function App() {
               >
                 عيد فطر سعيد
               </motion.h1>
-              <p className="font-sans text-xs md:text-sm text-rose-400 uppercase tracking-[0.3em] font-medium">
+              
+              <p className="font-sans text-xs md:text-sm text-rose-400 uppercase tracking-[0.3em] font-medium pt-4">
                 اضغط على الظرف لفتح المفاجأة
               </p>
             </div>
@@ -219,7 +190,7 @@ export default function App() {
                     rotateX: isOpening ? -180 : 0,
                     zIndex: isOpening ? 0 : 20
                   }}
-                  transition={{ duration: 0.8, ease: "easeInOut" }}
+                  transition={{ duration: 0.5, ease: "easeInOut" }}
                   style={{ transformOrigin: "top" }}
                   className="absolute top-0 left-0 w-full h-1/2 bg-[#f8f8f8] border-b border-rose-100 shadow-sm z-20"
                 >
@@ -342,7 +313,7 @@ export default function App() {
                     onClick={handleClose}
                     className="px-8 py-3 rounded-full border border-rose-100 text-rose-400 hover:text-rose-600 hover:bg-rose-50 transition-all text-sm font-medium tracking-widest uppercase"
                   >
-                    إغلاق الرسالة
+                    إغلاق
                   </button>
                 </motion.div>
               </div>
