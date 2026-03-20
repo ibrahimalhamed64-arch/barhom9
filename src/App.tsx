@@ -131,7 +131,7 @@ export default function App() {
     <div className="min-h-screen flex flex-col items-center justify-center p-4 relative bg-[#fdfaf6] overflow-x-hidden">
       <audio 
         ref={audioRef} 
-        src="/bg-music.m4a" 
+        src="/bg-music.mp3" 
         loop 
         preload="auto"
         onEnded={() => setIsPlaying(false)}
@@ -306,7 +306,6 @@ export default function App() {
                       src="/50_dinar.png" 
                       alt="50 Dinars"
                       className="w-full h-auto block transition-transform duration-700 group-hover:scale-110"
-                      referrerPolicy="no-referrer"
                     />
                     <div className="absolute bottom-4 right-4 z-20 bg-white/90 backdrop-blur px-4 py-2 rounded-full text-rose-600 font-bold text-sm shadow-sm">
                       عيدية خاصة 🎁
