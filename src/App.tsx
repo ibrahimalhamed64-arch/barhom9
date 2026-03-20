@@ -10,74 +10,158 @@ import { Mail, Heart, Sparkles, Music, Music2 } from 'lucide-react';
 
 export default function App() {
   const [isOpen, setIsOpen] = useState(false);
-  const [recipientName] = useState('أحلى الناس'); // Default name in Arabic
+  const [isOpening, setIsOpening] = useState(false);
+  const [recipientName] = useState('أحلى الناس');
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
 
+  // Sync audio element with isPlaying state
+  const [audioError, setAudioError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!audioRef.current) return;
+    
+    const audio = audioRef.current;
+    
+    const handleCanPlay = () => {
+      console.log("Audio can play");
+      setAudioError(null);
+    };
+    
+    const handleError = (e: any) => {
+      const error = audio.error;
+      let message = "Unknown audio error";
+      if (error) {
+        switch (error.code) {
+          case 1: message = "Aborted"; break;
+          case 2: message = "Network error"; break;
+          case 3: message = "Decode error"; break;
+          case 4: message = "Source not supported"; break;
+        }
+      }
+      console.error("Audio error:", message, error);
+      setAudioError(message);
+    };
+
+    audio.addEventListener('canplay', handleCanPlay);
+    audio.addEventListener('error', handleError);
+
+    return () => {
+      audio.removeEventListener('canplay', handleCanPlay);
+      audio.removeEventListener('error', handleError);
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (!audioRef.current) return;
+    
+    if (isPlaying) {
+      audioRef.current.volume = 1.0;
+      const playPromise = audioRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(error => {
+          console.error("Playback failed:", error);
+          setIsPlaying(false);
+        });
+      }
+    } else {
+      audioRef.current.pause();
+    }
+  }, [isPlaying]);
+
   const handleOpen = () => {
-    if (!isOpen) {
-      setIsOpen(true);
+    if (!isOpen && !isOpening) {
+      setIsOpening(true);
+      setIsPlaying(true);
       
-      // Play music
+      // Start music immediately on click to avoid browser blocks
       if (audioRef.current) {
-        audioRef.current.play().catch(err => console.log("Playback blocked:", err));
-        setIsPlaying(true);
+        audioRef.current.play().catch(e => console.error("Initial play failed:", e));
+      }
+      
+      // Delay the actual "open" state to allow flap animation
+      setTimeout(() => {
+        setIsOpen(true);
+        setIsOpening(false);
+        triggerConfetti();
+      }, 1000);
+    }
+  };
+
+  const handleClose = () => {
+    setIsOpen(false);
+    setIsPlaying(false); // Stop music when card closes
+  };
+
+  const triggerConfetti = () => {
+    const duration = 4 * 1000;
+    const animationEnd = Date.now() + duration;
+    const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 100 };
+
+    const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
+
+    const interval: any = setInterval(function() {
+      const timeLeft = animationEnd - Date.now();
+
+      if (timeLeft <= 0) {
+        return clearInterval(interval);
       }
 
-      // Trigger confetti
-      const duration = 3 * 1000;
-      const animationEnd = Date.now() + duration;
-      const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
-
-      const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
-
-      const interval: any = setInterval(function() {
-        const timeLeft = animationEnd - Date.now();
-
-        if (timeLeft <= 0) {
-          return clearInterval(interval);
-        }
-
-        const particleCount = 50 * (timeLeft / duration);
-        confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
-        confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
-      }, 250);
-    }
+      const particleCount = 50 * (timeLeft / duration);
+      confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
+      confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
+    }, 250);
   };
 
   const toggleMusic = (e: React.MouseEvent) => {
     e.stopPropagation();
+    const nextPlaying = !isPlaying;
+    setIsPlaying(nextPlaying);
+    
     if (audioRef.current) {
-      if (isPlaying) {
-        audioRef.current.pause();
+      if (nextPlaying) {
+        audioRef.current.play().catch(e => console.error("Toggle play failed:", e));
       } else {
-        audioRef.current.play();
+        audioRef.current.pause();
       }
-      setIsPlaying(!isPlaying);
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 relative bg-[#fdfaf6]">
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 relative bg-[#fdfaf6] overflow-x-hidden">
       <audio 
         ref={audioRef} 
-        src="/audio.m4a" 
+        src="/bg-music.m4a" 
         loop 
         preload="auto"
+        onEnded={() => setIsPlaying(false)}
+        onError={(e) => console.error("Audio tag error:", e)}
       />
 
+      {audioError && (
+        <div className="fixed bottom-4 left-4 bg-red-500 text-white p-2 rounded text-xs z-50">
+          Audio Error: {audioError}
+        </div>
+      )}
+
       {/* Music Toggle */}
-      <button 
+      <motion.button 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
         onClick={toggleMusic}
-        className="absolute top-6 right-6 z-50 p-3 bg-white/80 backdrop-blur-sm rounded-full shadow-sm border border-rose-100 text-rose-500 hover:bg-rose-50 transition-all"
+        className="fixed top-6 right-6 z-50 p-4 bg-white/90 backdrop-blur-md rounded-full shadow-lg border border-rose-100 text-rose-500 hover:bg-rose-50 transition-all group"
       >
-        {isPlaying ? <Music className="w-5 h-5 animate-pulse" /> : <Music2 className="w-5 h-5 opacity-50" />}
-      </button>
+        {isPlaying ? (
+          <Music className="w-6 h-6 animate-pulse" />
+        ) : (
+          <Music2 className="w-6 h-6 opacity-40 group-hover:opacity-100" />
+        )}
+      </motion.button>
 
       {/* Background Decoration */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-rose-200 blur-3xl" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-amber-100 blur-3xl" />
+      <div className="fixed inset-0 overflow-hidden pointer-events-none opacity-30">
+        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-rose-200/50 blur-[120px]" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-amber-100/50 blur-[120px]" />
       </div>
 
       <AnimatePresence mode="wait">
@@ -86,110 +170,177 @@ export default function App() {
             key="closed"
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 1.1, opacity: 0 }}
-            className="flex flex-col items-center gap-8 z-10"
+            exit={{ scale: 1.1, opacity: 0, transition: { duration: 0.5 } }}
+            className="flex flex-col items-center gap-12 z-10 w-full max-w-md"
           >
-            <div className="text-center space-y-2">
-              <h1 className="font-serif text-3xl md:text-4xl text-rose-800 italic">عيد فطر سعيد</h1>
-              <p className="font-sans text-sm text-gray-500 uppercase tracking-widest">اضغط لفتح المفاجأة</p>
+            <div className="text-center space-y-4">
+              <motion.h1 
+                initial={{ y: -20 }}
+                animate={{ y: 0 }}
+                className="font-serif text-4xl md:text-6xl text-rose-900 italic font-bold"
+              >
+                عيد فطر سعيد
+              </motion.h1>
+              <p className="font-sans text-xs md:text-sm text-rose-400 uppercase tracking-[0.3em] font-medium">
+                اضغط على الظرف لفتح المفاجأة
+              </p>
             </div>
 
-            <motion.button
+            <motion.div
               onClick={handleOpen}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="relative group cursor-pointer"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="relative cursor-pointer perspective-1000 group"
             >
               {/* Envelope Shadow */}
-              <div className="absolute inset-0 bg-black/5 blur-xl transform translate-y-4 scale-95 rounded-lg" />
+              <div className="absolute inset-0 bg-black/10 blur-2xl transform translate-y-8 scale-90 rounded-xl" />
               
-              {/* The Envelope */}
-              <div className="relative w-72 h-48 md:w-80 md:h-56 bg-white border border-rose-100 rounded-lg shadow-sm flex flex-col items-center justify-center overflow-hidden">
-                {/* Envelope Flap Design */}
-                <div className="absolute top-0 left-0 w-full h-full border-t-[100px] border-t-rose-50/50 border-x-[150px] border-x-transparent md:border-x-[160px]" />
+              {/* The Envelope Body */}
+              <div className="relative w-[320px] h-[220px] md:w-[400px] md:h-[280px] bg-[#fcfcfc] border border-rose-100 rounded-xl shadow-xl flex flex-col items-center justify-center overflow-hidden">
                 
-                <div className="z-10 flex flex-col items-center gap-2">
-                  <div className="w-12 h-12 rounded-full bg-rose-50 flex items-center justify-center mb-2">
-                    <Mail className="text-rose-400 w-6 h-6" />
-                  </div>
-                  <div className="font-serif text-xl text-rose-900">إلى: {recipientName}</div>
+                {/* Envelope Flap (Animated) */}
+                <motion.div 
+                  initial={false}
+                  animate={{ 
+                    rotateX: isOpening ? -180 : 0,
+                    zIndex: isOpening ? 0 : 20
+                  }}
+                  transition={{ duration: 0.8, ease: "easeInOut" }}
+                  style={{ transformOrigin: "top" }}
+                  className="absolute top-0 left-0 w-full h-1/2 bg-[#f8f8f8] border-b border-rose-100 shadow-sm z-20"
+                >
+                  {/* Triangle Flap Shape */}
+                  <div className="absolute inset-0 border-t-[140px] border-t-rose-50/80 border-x-[160px] md:border-x-[200px] border-x-transparent" />
+                </motion.div>
+
+                {/* Content Inside (Visible when opening) */}
+                <div className="z-10 flex flex-col items-center gap-4">
+                  <motion.div 
+                    animate={isOpening ? { y: -20, opacity: 0 } : {}}
+                    className="w-16 h-16 rounded-full bg-rose-50 flex items-center justify-center mb-2 shadow-inner"
+                  >
+                    <Mail className="text-rose-400 w-8 h-8" />
+                  </motion.div>
+                  <motion.div 
+                    animate={isOpening ? { y: -20, opacity: 0 } : {}}
+                    className="font-serif text-2xl text-rose-900 font-medium"
+                  >
+                    إلى: {recipientName}
+                  </motion.div>
                 </div>
 
                 {/* Wax Seal */}
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20">
-                  <div className="w-10 h-10 bg-rose-600 rounded-full shadow-lg flex items-center justify-center border-2 border-rose-700">
-                    <Heart className="text-white w-5 h-5 fill-current" />
+                <motion.div 
+                  animate={isOpening ? { y: -100, opacity: 0, scale: 0.5 } : {}}
+                  className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30"
+                >
+                  <div className="w-14 h-14 bg-rose-600 rounded-full shadow-2xl flex items-center justify-center border-4 border-rose-700/50 group-hover:scale-110 transition-transform">
+                    <Heart className="text-white w-7 h-7 fill-current" />
                   </div>
-                </div>
+                </motion.div>
               </div>
-            </motion.button>
+            </motion.div>
           </motion.div>
         ) : (
           <motion.div
             key="opened"
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3, duration: 0.8, ease: "easeOut" }}
-            className="z-20 w-full max-w-lg mx-auto"
+            initial={{ opacity: 0, scale: 0.8, y: 100 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ type: "spring", damping: 20, stiffness: 100 }}
+            className="z-20 w-full max-w-2xl mx-auto py-12"
           >
-            <div className="bg-white p-8 md:p-12 rounded-3xl shadow-2xl border border-rose-50 relative overflow-hidden">
+            <div className="bg-white p-8 md:p-16 rounded-[2.5rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)] border border-rose-50 relative overflow-hidden">
               {/* Card Decoration */}
-              <div className="absolute top-0 right-0 p-4 opacity-10">
-                <Sparkles className="w-24 h-24 text-rose-600" />
+              <div className="absolute -top-12 -right-12 opacity-5">
+                <Sparkles className="w-64 h-64 text-rose-600" />
+              </div>
+              <div className="absolute -bottom-12 -left-12 opacity-5 rotate-180">
+                <Sparkles className="w-64 h-64 text-rose-600" />
               </div>
 
-              <div className="relative z-10 text-center space-y-8">
+              <div className="relative z-10 text-center space-y-10">
                 <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ delay: 0.8, type: "spring", stiffness: 200 }}
-                  className="inline-flex items-center justify-center w-16 h-16 bg-rose-50 rounded-full mb-4"
+                  initial={{ scale: 0, rotate: -180 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ delay: 0.5, type: "spring", stiffness: 200 }}
+                  className="inline-flex items-center justify-center w-20 h-20 bg-rose-50 rounded-full mb-4 shadow-sm"
                 >
-                  <Heart className="text-rose-500 w-8 h-8 fill-current" />
+                  <Heart className="text-rose-500 w-10 h-10 fill-current" />
                 </motion.div>
 
-                <div className="space-y-4">
-                  <h2 className="font-serif text-4xl md:text-5xl text-rose-900 leading-tight">
+                <div className="space-y-6">
+                  <motion.h2 
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 0.7 }}
+                    className="font-serif text-5xl md:text-7xl text-rose-950 leading-tight font-bold"
+                  >
                     كل عام وأنت بخير
-                  </h2>
-                  <div className="h-px w-24 bg-rose-200 mx-auto" />
+                  </motion.h2>
                   
-                  <p className="font-serif text-xl md:text-2xl text-rose-800 leading-relaxed italic">
-                    "أحياناً يكون العيد شخص لست بانتظار عيداً لأهنئك إنما وجودك معي عيدي دائماً ان شاء الله دايما على طول اشوفك مبسوطه يارب وتتهني بالعيد يارب الله يسعدك يارب يوفقك ويبعد عنك كل حسود كنتي بتجنني زي القمر ❣."
-                  </p>
+                  <motion.div 
+                    initial={{ width: 0 }}
+                    animate={{ width: 120 }}
+                    transition={{ delay: 1, duration: 0.8 }}
+                    className="h-1 bg-rose-200 mx-auto rounded-full" 
+                  />
+                  
+                  <motion.p 
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 1.2 }}
+                    className="font-serif text-2xl md:text-3xl text-rose-900 leading-[1.6] italic px-4"
+                  >
+                    "أحياناً يكون العيد شخصاً... لست بانتظار عيدٍ لأهنئك، إنما وجودك معي هو عيدي دائماً. ان شاء الله دايماً وأبداً أشوفك مبسوطة وتتهني بالعيد يارب. الله يسعدك ويوفقك ويبعد عنك كل سوء... كنتِ بتجنني زي القمر ❣."
+                  </motion.p>
 
                   {/* 50 Dinar Image (Eidiya) */}
                   <motion.div
-                    initial={{ y: 20, opacity: 0, rotate: 2 }}
-                    animate={{ y: 0, opacity: 1, rotate: 2 }}
-                    transition={{ delay: 1.2, duration: 0.6 }}
-                    className="relative w-full max-w-[320px] mx-auto mt-8 rounded-lg overflow-hidden shadow-2xl border-2 border-rose-100 group bg-white"
+                    initial={{ y: 50, opacity: 0, rotate: 5, scale: 0.9 }}
+                    animate={{ y: 0, opacity: 1, rotate: -2, scale: 1 }}
+                    transition={{ delay: 1.8, duration: 1, type: "spring" }}
+                    className="relative w-full max-w-[380px] mx-auto mt-12 rounded-2xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.15)] border-4 border-white group"
                   >
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity z-10" />
                     <img 
                       src="/50_dinar.png" 
                       alt="50 Dinars"
-                      className="w-full h-auto block transition-transform duration-500 group-hover:scale-105"
+                      className="w-full h-auto block transition-transform duration-700 group-hover:scale-110"
+                      referrerPolicy="no-referrer"
                     />
+                    <div className="absolute bottom-4 right-4 z-20 bg-white/90 backdrop-blur px-4 py-2 rounded-full text-rose-600 font-bold text-sm shadow-sm">
+                      عيدية خاصة 🎁
+                    </div>
                   </motion.div>
                 </div>
 
-                <div className="pt-8 flex flex-col items-center gap-4">
-                  <div className="font-serif text-2xl text-rose-900">صديقك المخلص</div>
-                </div>
-
-                <motion.button
-                  onClick={() => setIsOpen(false)}
-                  className="mt-8 text-rose-400 hover:text-rose-600 text-sm font-sans transition-colors"
-                  whileHover={{ scale: 1.05 }}
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 2.5 }}
+                  className="pt-12 flex flex-col items-center gap-6"
                 >
-                  إغلاق الرسالة
-                </motion.button>
+                  <div className="font-serif text-3xl text-rose-950 font-medium">صديقك المخلص</div>
+                  
+                  <button
+                    onClick={handleClose}
+                    className="px-8 py-3 rounded-full border border-rose-100 text-rose-400 hover:text-rose-600 hover:bg-rose-50 transition-all text-sm font-medium tracking-widest uppercase"
+                  >
+                    إغلاق الرسالة
+                  </button>
+                </motion.div>
               </div>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
+      <style>{`
+        .perspective-1000 {
+          perspective: 1000px;
+        }
+      `}</style>
     </div>
   );
 }
+
