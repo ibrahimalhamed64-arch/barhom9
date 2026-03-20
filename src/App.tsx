@@ -131,12 +131,17 @@ export default function App() {
     <div className="min-h-screen flex flex-col items-center justify-center p-4 relative bg-[#fdfaf6] overflow-x-hidden">
       <audio 
         ref={audioRef} 
-        src="/bg-music.mp3" 
         loop 
         preload="auto"
         onEnded={() => setIsPlaying(false)}
-        onError={(e) => console.error("Audio tag error:", e)}
-      />
+        onError={(e) => {
+          console.error("Audio tag error:", e);
+          setAudioError("Source not supported or file missing");
+        }}
+      >
+        <source src="/bg-music.mp3" type="audio/mpeg" />
+        <source src="bg-music.mp3" type="audio/mpeg" />
+      </audio>
 
       {audioError && (
         <div className="fixed bottom-4 left-4 bg-red-500 text-white p-2 rounded text-xs z-50">
